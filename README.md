@@ -5,8 +5,10 @@ Analysis of SARS-nCoV-2 Genomes" from
 [Dr Vinod Scaria's Lab](http://vinodscaria.rnabiology.org/covid-19)
 
 ## create cond env for packages
-* additional packages: entrez-direct, sra-tools for sra download
-* additional packages: snakemake for pipeline, multiqc
+* additional packages: entrez-direct for esearch/efetch
+* sra-tools for srafiles download
+* additional packages: snakemake for pipeline
+* multiqc: combine fastqc output htmls
 ```
 conda create --name covid19 && conda activate covid19
 conda install -c  bioconda -y fastqc trimmomatic samtools hisat2 bedtools \
@@ -47,16 +49,16 @@ cd <root conda dir>/envs/covid19/opt/krona/
 ```
 
 ## run snakemake pipeline
-
-### to check individual steps without running
+* `config.yaml` needs to be changed accordingly
+To check individual steps without running
 ```
 snakemake -np -s covid19_analysis.snakemake
 ```
-### to run in slurm based cluster
+To run snakemake script in slurm based clusters. Change `cluster.yaml` if needed. 
 ```
 sh covid19_analysis.snakemake
 ```
-### to run in local computer
+to run in local computer
 ```
 snakemake -s covid19_analysis.snakemake --restart-times 1 
 ```
