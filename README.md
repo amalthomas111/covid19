@@ -50,11 +50,13 @@ cd <root conda dir>/envs/covid19/opt/krona/
 
 ## run snakemake pipeline
 * `config.yaml` needs to be changed accordingly
+
 To check individual steps without running
 ```
 snakemake -np -s covid19_analysis.snakemake
 ```
-To run snakemake script in slurm based clusters. Change `cluster.yaml` if needed. 
+To run snakemake script in slurm based clusters.
+* change `cluster.yaml` if needed.
 ```
 sh covid19_analysis.snakemake
 ```
