@@ -12,3 +12,12 @@ kraken2_single:
     ntasks : "4"
 krona_single:
     mem : "16000MB"
+hisat2_maphuman_single:
+    mem : "16000MB"
+    ntasks: "4"
+create_unmappedfastq:
+    mem: "10000"
+    ntasks: "4"
+hisat2_mapcovid_single:
+    mem : "16000MB"
+    ntasks: "4"

@@ -95,17 +95,17 @@ print("GSM single keys:\n",GSM_SINGLE_DICT_KEYS)
 print("\nGSM paired keys:\n",GSM_PAIRED_DICT_KEYS)
 #print("All libs:\n",ALL_SRR)
 
-def return_hisat_index(wildcards):
-        #print("star index:inputfile:",wildcards.sample)
-        return(config["{}_star_index".format(SPECIES_SRR[wildcards.sample])])
+def hisat2_single_input(wildcards):
+    return(["data/{}_trimmed.fq.gz".format(srr) for srr in SINGLE_SRR])
 
 rule all:
     input:
         #"mapping_stats.txt",
         "qualityreport/multiqc_report.html",
         expand('data/{sample}_trimmed.fq.gz',sample=SINGLE_SRR),
-        "outputs/covid19_kraken2_out.txt",
-        "outputs/covid19_krona.html"
+        #"outputs/covid19_kraken2_out.txt","outputs/covid19_krona.html",
+        "bams/covid19_complete.bam",
+        "bams/covid19.bam", "outputs/covid19_flagstats.txt"
 rule fastqdump_paired:
     input:
         "data/{sample}.sra"
@@ -232,4 +232,70 @@ rule krona_single:
         r"""
         cut -f2,3 {input} > {params.temp} && \
         ktImportTaxonomy  {params.temp} -o {output}
+        """
+rule hisat2_maphuman_single:
+    input:
+        expand("data/{sample}_trimmed.fq.gz",sample=SINGLE_SRR)
+    params:
+        inputlist = hisat2_single_input,
+        index = config["Homo_sapiens_hisat2index"]
+    threads:4
+    log: "logs/covid19_mapping_log.txt"
+    output: "bams/covid19_complete.bam"
+    run:
+        if len(params.inputlist) >= 1:
+            infiles = ','.join(params.inputlist)
+            print(infiles)
+            shell(r"""hisat2 -x {params.index} -p {threads} -U {infiles} \
+            --dta-cufflinks --summary-file {log}|samtools sort -@ \
+            {threads} - -o {output} -O BAM""")
+"""
+For single end data one can use
+samtools view -b -f 4 bams/covid19_complete.bam | \
+samtools sort -@ 4  -n - -o bams/newtest.bam -O BAM
+"""
+rule create_unmappedbam:
+    input: "bams/covid19_complete.bam"
+    output:
+        bam="bams/unmapped.bam",
+        t1 = temp("bams/temp1.bam"),
+        t2 = temp("bams/temp2.bam"),
+        t3 = temp("bams/temp3.bam")
+    threads:4
+    shell:
+        r"""
+        samtools view -u -f 4 -F 264 {input} > {output.t1} && \
+        samtools view -u -f 8 -F 260 {input} > {output.t2} && \
+        samtools view -u -f 12 -F 256 {input} > {output.t3} && \
+        samtools merge -@ {threads} -u - bams/temps[123].bam|samtools sort \
+        -@ {threads} -n - -o {output.bam} -O BAM
+        """
+rule create_unmappedfastq:
+    input:"bams/unmapped.bam"
+    output:
+        fq="bams/unmapped.fq"
+    shell:
+        r"""
+        bamToFastq -i {input} -fq {output}
+        """
+rule hisat2_mapcovid_single:
+    input:
+        "bams/unmapped.fq"
+    params:
+        index = config["Severe_acute_respiratory_syndrome_coronavirus_2_hisat2index"]
+    threads:4
+    log: "logs/covid19_covidmapping_log.txt"
+    output: "bams/covid19.bam"
+    shell:
+        r"""
+        hisat2 -x {params.index} -p {threads} -U {input} \
+            --dta-cufflinks --summary-file {log}|samtools sort -@ \
+            {threads} - -o {output} -O BAM
+        """
+rule map_stats:
+    input: "bams/covid19.bam"
+    output: "outputs/covid19_flagstats.txt"
+    shell:
+        r"""
+        samtools flagstat {input} > {output}
         """
