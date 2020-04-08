@@ -18,6 +18,7 @@ entrez-direct sra-tools  snakemake multiqc
 
 ## get hg38 genome &  SARS-CoV-2 genome, build hisat2 index
 ```
+# execute from working directory. My working dir is covid19 
 mkdir genome && cd genome
 wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_33/GRCh38.p13.genome.fa.gz
 efetch -db sequences -format fasta -id  NC_045512.2 > NC_045512.2.fna
@@ -43,13 +44,29 @@ tar -xvf minikraken_8GB_202003.tgz
 
 ## update db for Krona
 ```
-cd <root conda dir>/envs/covid19/opt/krona/
+cd <conda directory path>/envs/covid19/opt/krona/
 ./updateTaxonomy.sh
 ./updateAccessions.sh
 ```
 
 ## run snakemake pipeline
+* needs to be run from working directory
 * `config.yaml` needs to be changed accordingly
+* list.txt is created by `getsrainfo.sh` in downloading SRR files in an input
+for the snakemake script. Copy this file to working directory.
+```
+cp data/list.txt .
+```
+Working directory tree view:
+.
+├── cluster.yaml
+├── config.yaml
+├── covid19_analysis.snakemake
+├── data
+├── db
+├── genome
+├── list.txt
+└── runcovid19_analysis.sh
 
 To check individual steps without running
 ```
