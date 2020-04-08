@@ -1,0 +1,1 @@
+snakemake -s   covid19_analysis.snakemake -k  --cluster-config rnaseq_cluster.yaml --jobs 50  --jobname 'cov.{rulename}.{jobid}.sh' --restart-times 1  --cluster "sbatch -p {cluster.p} --time={cluster.time} --mem={cluster.mem} --ntasks={cluster.ntasks}"

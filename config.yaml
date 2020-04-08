@@ -1,0 +1,3 @@
+specieslist: ["Severe_acute_respiratory_syndrome_coronavirus_2","Homo_sapiens"]
+kraken2_db: "<path>/covid19/db/minikraken_8GB_20200312"
+Homo_sapiens_hisat2index: "<path>/covid19/genome/GRCh38.p13.genome"

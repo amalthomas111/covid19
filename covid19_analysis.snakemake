@@ -1,0 +1,235 @@
+import os,sys,glob
+
+if not os.path.exists("config.yaml"):
+        print("Error:config.yaml not found. Exiting!")
+        exit(1)
+if not os.path.exists("list.txt"):
+        print("Error:list.txt not found. You can create list.txt from"\
+              "runinfo file using srainfo.sh")
+        exit(1)
+
+configfile: 'config.yaml'
+SINGLE_SRR=[]
+PAIRED_SRR=[]
+SPECIES_SRR={}
+SPECIES_GSM={}
+GSM_SINGLE_DICT={}
+GSM_PAIRED_DICT={}
+
+specieslist = config["specieslist"]
+"""
+Input list.txt should be in this format:
+SRR306834	SINGLE	Pan_paniscus	RNA-Seq	cDNA	GSM752687
+SRR306835	SINGLE	Pan_paniscus	RNA-Seq	cDNA	GSM752688
+SRR306836	SINGLE	Pan_paniscus	RNA-Seq	cDNA	GSM752689
+SRR306837	SINGLE	Pan_paniscus	RNA-Seq	cDNA	GSM752690
+SRR306838	SINGLE	Homo_sapiens	RNA-Seq	cDNA	GSM752691
+SRR306839	SINGLE	Homo_sapiens	RNA-Seq	cDNA	GSM752692
+SRR306840	PAIRED	Homo_sapiens	RNA-Seq	cDNA	GSM752693
+First 3 columns are mandatory. if only first 3 columns are given
+then GSE columsn is assumed to be same as the first column and
+all samples are assumed to be be "RNA-Seq"
+"""
+
+for line in open("list.txt"):
+        if line!="\n" and line != "":
+                elements = line.strip().split("\t")
+                elements[2] = elements[2].replace(" ","_")
+                #print(line,str(len(elements)))
+                if len(elements) == 6 and elements[3].upper() == "RNA-SEQ":
+                        if elements[2] not in specieslist:
+                                print("*****NOT FOUND:",elements[0],elements[2])
+                                continue
+                        if elements[1].upper() == "SINGLE":
+                                SINGLE_SRR.append(elements[0])
+                                SPECIES_SRR[elements[0]]=elements[2]
+                                SPECIES_GSM[elements[5]]=elements[2]
+                                try:
+                                        GSM_SINGLE_DICT[elements[5]].append(elements[0])
+                                except KeyError:
+                                        GSM_SINGLE_DICT[elements[5]]=[]
+                                        GSM_SINGLE_DICT[elements[5]].append(elements[0])
+                        elif elements[1].upper() == "PAIRED":
+                                PAIRED_SRR.append(elements[0])
+                                SPECIES_SRR[elements[0]]=elements[2]
+                                SPECIES_GSM[elements[5]]=elements[2]
+                                try:
+                                        GSM_PAIRED_DICT[elements[5]].append(elements[0])
+                                except KeyError:
+                                        GSM_PAIRED_DICT[elements[5]]=[]
+                                        GSM_PAIRED_DICT[elements[5]].append(elements[0])
+                elif len(elements) == 3:
+                        if elements[2] not in specieslist:
+                                print("*****NOT FOUND:",elements[0],elements[2])
+                                continue
+                        if elements[1].upper() == "SINGLE":
+                                SINGLE_SRR.append(elements[0])
+                                SPECIES_SRR[elements[0]]=elements[2]
+                                SPECIES_GSM[elements[0]]=elements[2]
+                                try:
+                                        GSM_SINGLE_DICT[elements[0]].append(elements[0])
+                                except KeyError:
+                                        GSM_SINGLE_DICT[elements[0]]=[]
+                                        GSM_SINGLE_DICT[elements[0]].append(elements[0])
+                        elif elements[1].upper() == "PAIRED":
+                                PAIRED_SRR.append(elements[0])
+                                SPECIES_SRR[elements[0]]=elements[2]
+                                SPECIES_GSM[elements[0]]=elements[2]
+                                try:
+                                        GSM_PAIRED_DICT[elements[0]].append(elements[0])
+                                except KeyError:
+                                        GSM_PAIRED_DICT[elements[0]]=[]
+                                        GSM_PAIRED_DICT[elements[0]].append(elements[0])
+ALL_SRR = SINGLE_SRR + PAIRED_SRR
+GSM_SINGLE_DICT_KEYS = list(GSM_SINGLE_DICT.keys())
+GSM_PAIRED_DICT_KEYS = list(GSM_PAIRED_DICT.keys())
+
+print("Single end:\n",SINGLE_SRR,"\nGSM single dict:")
+print(GSM_SINGLE_DICT)
+print("======================\n")
+print("Paired end:\n",PAIRED_SRR,"\nGSM paired dict:")
+print(GSM_PAIRED_DICT)
+print("======================\n")
+
+print("GSM single keys:\n",GSM_SINGLE_DICT_KEYS)
+print("\nGSM paired keys:\n",GSM_PAIRED_DICT_KEYS)
+#print("All libs:\n",ALL_SRR)
+
+def return_hisat_index(wildcards):
+        #print("star index:inputfile:",wildcards.sample)
+        return(config["{}_star_index".format(SPECIES_SRR[wildcards.sample])])
+
+rule all:
+    input:
+        #"mapping_stats.txt",
+        "qualityreport/multiqc_report.html",
+        expand('data/{sample}_trimmed.fq.gz',sample=SINGLE_SRR),
+        "outputs/covid19_kraken2_out.txt",
+        "outputs/covid19_krona.html"
+rule fastqdump_paired:
+    input:
+        "data/{sample}.sra"
+    output:
+        file1 = temp("data/{sample}_1.fastq.gz"),
+        file2 = temp("data/{sample}_2.fastq.gz")
+    params:
+        "data"
+    message:
+        "Running fastqdump on paired: {wildcards.sample}"
+    shell:
+        """
+        fastq-dump --gzip --skip-technical --split-3  --dumpbase {input} -O {params}
+        """
+rule fastqdump_single:
+    input:
+        "data/{sample}.sra"
+    output:
+        file1 = "data/{sample}.fastq.gz"
+    message:
+        "Running fastqdump on single: {wildcards.sample}"
+    params:
+        "data"
+    shell:
+        """
+        fastq-dump --gzip --skip-technical --dumpbase {input} -O {params}
+        """
+rule fastqc_paired:
+    input:
+        mate1 = "data/{sample}_1.fastq.gz",
+        mate2 = "data/{sample}_2.fastq.gz"
+    output:
+        output1 = "quality/{sample}_1_fastqc.html",
+        output2 = "quality/{sample}_2_fastqc.html"
+    message:
+        "Running paired fastqc on paired: {wildcards.sample}"
+    shell:
+        """
+        fastqc {input.mate1} {input.mate2} -o quality
+        """
+rule fastqc_single:
+    input:
+        'data/{sample}.fastq.gz'
+    output:
+        'quality/{sample}_fastqc.html'
+    message:
+        "Running single fastqc on single:{wildcards.sample}"
+    shell:
+        """
+        fastqc {input} -o quality
+        """
+rule multiqc:
+        input:
+                expand("quality/{sample}_fastqc.html",sample=SINGLE_SRR),
+                expand("quality/{sample}_1_fastqc.html",sample=PAIRED_SRR),
+        output:
+                "qualityreport/multiqc_report.html"
+        message:
+                "Running multiqc"
+        shell:
+                """
+                multiqc quality -o qualityreport
+                """
+rule trim_adapters_paired:
+        input:
+                mate1 = 'data/{sample}_1.fastq.gz',
+                mate2 = 'data/{sample}_2.fastq.gz'
+        output:
+                f1 = 'data/{sample}_1_trimmed.fq.gz',
+                f2 = 'data/{sample}_2_trimmed.fq.gz',
+                f1_unpaired = 'data/{sample}_1_trimmed_unpaired.fq.gz',
+                f2_unpaired = 'data/{sample}_2_trimmed_unpaired.fq.gz'
+        threads: 4
+        message:
+                "Executing trimming on paired-end:{wildcards.sample}."
+        log:
+                "logs/{sample}.trim.log"
+        shell:
+                r"""
+                trimmomatic PE -phred33 -threads {threads} -trimlog {log} \
+                {input.mate1} {input.mat2} {output.f1} {output.f1_unpaired} \
+                {output.f2} {output.f2_unpaired} \
+                ILLUMINACLIP:TruSeq3-PE.fa:2:30:10:2:keepBothReads LEADING:3 \
+                TRAILING:3 MINLEN:36
+                """
+rule trim_adapters_single:
+        input:
+                'data/{sample}.fastq.gz'
+        output:
+                'data/{sample}_trimmed.fq.gz'
+        threads: 4
+        message:
+                "Executing trimming on single end:{wildcards.sample}."
+        log:
+                "logs/{sample}.trim.log"
+        shell:
+                r"""
+                trimmomatic SE -phred33 -trimlog {log} {input} {output} \
+                ILLUMINACLIP:TruSeq3-SE:2:30:10 LEADING:3 TRAILING:3 \
+                SLIDINGWINDOW:4:15 MINLEN:36
+                """
+rule kraken2_single:
+    input:
+        expand("data/{sample}_trimmed.fq.gz",sample=SINGLE_SRR)
+    threads:4
+    params:
+        kraken2_db=config["kraken2_db"]
+    output:
+        report="outputs/covid19_kraken2_report.txt",
+        out="outputs/covid19_kraken2_out.txt"
+    shell:
+        r"""
+        kraken2 --gzip-compressed --db {params.kraken2_db} --threads 4 \
+        --report {output.report} {input} --output {output.out}
+        """
+rule krona_single:
+    input:
+        "outputs/covid19_kraken2_out.txt"
+    output:
+        "outputs/covid19_krona.html"
+    params:
+        temp = "outputs/covid19_kraken.korna"
+    shell:
+        r"""
+        cut -f2,3 {input} > {params.temp} && \
+        ktImportTaxonomy  {params.temp} -o {output}
+        """
