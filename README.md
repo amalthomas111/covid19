@@ -58,6 +58,7 @@ for the snakemake script. Copy this file to working directory.
 cp data/list.txt .
 ```
 Working directory tree view:
+```bash
 .
 ├── cluster.yaml
 ├── config.yaml
@@ -67,7 +68,7 @@ Working directory tree view:
 ├── genome
 ├── list.txt
 └── runcovid19_analysis.sh
-
+```
 To check individual steps without running
 ```
 snakemake -np -s covid19_analysis.snakemake
