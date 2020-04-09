@@ -21,3 +21,18 @@ create_unmappedfastq:
 hisat2_mapcovid_single:
     mem : "16000MB"
     ntasks: "4"
+create_bcf:
+    mem : "16000MB"
+    ntasks: "4"
+runmegahit:
+    mem : "16000MB"
+    ntasks: "4"
+runspade:
+    mem : "16000MB"
+    ntasks: "4"
+runspade_isolate:
+    mem : "16000MB"
+    ntasks: "4"
+runquast:
+    mem : "12000MB"
+    ntasks: "4"

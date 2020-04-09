@@ -100,12 +100,13 @@ def hisat2_single_input(wildcards):
 
 rule all:
     input:
-        #"mapping_stats.txt",
         "qualityreport/multiqc_report.html",
         expand('data/{sample}_trimmed.fq.gz',sample=SINGLE_SRR),
-        #"outputs/covid19_kraken2_out.txt","outputs/covid19_krona.html",
+        "outputs/covid19_kraken2_out.txt","outputs/covid19_krona.html",
         "bams/covid19_complete.bam",
-        "bams/covid19.bam", "outputs/covid19_flagstats.txt"
+        "bams/covid19.bam", "outputs/covid19_flagstats.txt",
+        "covid19_picardstats.alignment_summary_metrics",
+        "outputs/covid19_consensus.fa","quast_output/report.html"
 rule fastqdump_paired:
     input:
         "data/{sample}.sra"
@@ -298,4 +299,92 @@ rule map_stats:
     shell:
         r"""
         samtools flagstat {input} > {output}
+        """
+rule picard_stats:
+    input: "bams/covid19.bam"
+    output: "covid19_picardstats.alignment_summary_metrics"
+    params:
+        outname = "covid19_picardstats",
+        genome = config["Severe_acute_respiratory_syndrome_coronavirus_2_genome"]
+    shell:
+        r"""
+        picard CollectMultipleMetrics I={input} \
+        O={params.outname} R={params.genome}
+        """
+rule create_bcf:
+    input: "bams/covid19.bam"
+    output: "outputs/covid19.bcf"
+    params:
+        genome = config["Severe_acute_respiratory_syndrome_coronavirus_2_genome"]
+    shell:
+        r"""
+        samtools faidx {params.genome}
+        bcftools mpileup --max-depth 1000  -Ou -f {params.genome} {input}|\
+        bcftools call --ploidy 1 -mv -Ob -o {output}
+        """
+rule filter_bcf:
+    input: "outputs/covid19.bcf"
+    output: "outputs/covid19_norm_filtindels.bcf"
+    params:
+        genome =config["Severe_acute_respiratory_syndrome_coronavirus_2_genome"],
+        norm = "outputs/covid19_norm.bcf"
+    shell:
+        r"""
+        bcftools norm -f {params.params} {input} -Ob -o {params.norm} && \
+        bcftools filter --IndelGap 5  {params.norm} -Ob -o {output} && \
+        bcftools index {output}
+        """
+rule create_consensus:
+    input: "outputs/covid19_norm_filtindels.bcf"
+    output: "outputs/covid19_consensus.fa"
+    params:
+        genome =config["Severe_acute_respiratory_syndrome_coronavirus_2_genome"]
+    shell:
+        r"""
+        bcftools consensus -f {params.params} {input} > {output}
+        """
+rule runmegahit:
+    input: "bams/unmapped.fq"
+    output: "assembly/denovo_covid19_megahit/final.contigs.fa"
+    params: "assembly/denovo_covid19_megahit"
+    threads: 4
+    shell:
+        r"""
+        megahit -r {input} --min-count 3 -t {threads} -o {params}
+        """
+rule runspade:
+    input: "bams/unmapped.fq",
+    output: "assembly/denovo_covid19_spades/contigs.fasta"
+    params: "assembly/denovo_covid19_spades"
+    threads: 4
+    shell:
+        r"""
+        spades.py -t {threads} -o {params}  -s {input}
+        """
+rule runspade_isolate:
+    input: "bams/unmapped.fq",
+    output: "assembly/denovo_covid19_spades_isolate/contigs.fasta"
+    params: "assembly/denovo_covid19_spades_isolate"
+    threads: 4
+    shell:
+        r"""
+        spades.py -t {threads} --isolate -o {params}  -s {input}
+        """
+rule runquast:
+    input:
+        m1 = "assembly/denovo_covid19_megahit/final.contigs.fa",
+        m2 = "assembly/denovo_covid19_spades/contigs.fasta",
+        m3 = "assembly/denovo_covid19_spades_isolate/contigs.fasta"
+    output: "quast_output/report.html"
+    params:
+        out = "quast_output",
+        l1 = "mega",
+        l2 = "spade",
+        l3 = "spade_isolate",
+        genome=config["Severe_acute_respiratory_syndrome_coronavirus_2_genome"]
+    threads:4
+    shell:
+        r"""
+        quast.py -o {params.out} -r {params.genome} -t 4 -m 1000 -l \
+        "{params.l1},{params.l2},{params.l3}" {input.m1} {input.m2} {input.m3}
         """
