@@ -9,11 +9,13 @@ Analysis of SARS-nCoV-2 Genomes" from
 * sra-tools for srafiles download
 * additional packages: snakemake for pipeline
 * multiqc: combine fastqc output htmls
+* clustalw: for MSA
 ```
 conda create --name covid19 && conda activate covid19
 conda install -c  bioconda -y fastqc trimmomatic samtools hisat2 bedtools \
-bcftools seqtk varscan kraken22 krona megahit SPAdes spades quast mafft \
+bcftools seqtk varscan kraken22 krona megahit SPAdes spades quast mafft picard\
 entrez-direct sra-tools  snakemake multiqc
+conda install -c biobuilds clustalw
 ```
 
 ## get hg38 genome &  SARS-CoV-2 genome, build hisat2 index
@@ -52,8 +54,9 @@ cd <conda directory path>/envs/covid19/opt/krona/
 ## run snakemake pipeline
 * needs to be run from working directory
 * `config.yaml` needs to be changed accordingly
-* list.txt is created by `getsrainfo.sh` in downloading SRR files in an input
-for the snakemake script. Copy this file to working directory.
+* list.txt is created by `getsrainfo.sh` while downloading SRR files. 
+`list.txt` in required for the snakemake script. Copy `list.txt` to 
+working directory.
 ```
 cp data/list.txt .
 ```
@@ -80,5 +83,5 @@ sh covid19_analysis.snakemake
 ```
 to run in local computer
 ```
-snakemake -s covid19_analysis.snakemake --restart-times 1 
+snakemake -s covid19_analysis.snakemake -k --restart-times 1 
 ```
