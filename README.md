@@ -4,7 +4,8 @@ Repository replicating steps of "Computational Protocol for Assembly and
 Analysis of SARS-nCoV-2 Genomes" from 
 [Dr Vinod Scaria's Lab](http://vinodscaria.rnabiology.org/covid-19)
 
-## create cond env for packages
+## create conda env for packages
+Install [anaconda](https://www.anaconda.com/distribution/).
 * additional packages: entrez-direct for esearch/efetch
 * sra-tools for srafiles download
 * additional packages: snakemake for pipeline
@@ -16,6 +17,10 @@ conda install -c  bioconda -y fastqc trimmomatic samtools hisat2 bedtools \
 bcftools seqtk varscan kraken22 krona megahit SPAdes spades quast mafft picard\
 entrez-direct sra-tools  snakemake multiqc
 conda install -c biobuilds clustalw
+```
+OR install via conda config yaml file:
+```
+conda env create -f covid19_condaenv.yml
 ```
 
 ## get hg38 genome &  SARS-CoV-2 genome, build hisat2 index
@@ -79,7 +84,7 @@ snakemake -np -s covid19_analysis.snakemake
 To run snakemake script in slurm based clusters.
 * change `cluster.yaml` if needed.
 ```
-sh covid19_analysis.snakemake
+sh runcovid19_analysis.sh
 ```
 to run in local computer
 ```
